@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added `summaryModel` config for choosing the default curator summary draft model from `~/.pi/web-search.json`.
 
+### Fixed
+- Migrated extension tool schemas from `@sinclair/typebox` to Pi's bundled `typebox` 1.x import path.
+
 ## [0.10.6] - 2026-04-04
 
 ### Changed
