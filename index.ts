@@ -39,6 +39,28 @@ import { isGeminiApiAvailable } from "./gemini-api.js";
 import { getActiveGoogleEmail, isGeminiWebAvailable } from "./gemini-web.js";
 import { isBrowserCookieAccessAllowed } from "./gemini-web-config.ts";
 
+function isWSL(): boolean {
+	try {
+		// Check for WSLInterop first (most reliable, exists even if interop disabled)
+		if (existsSync("/proc/sys/fs/binfmt_misc/WSLInterop")) {
+			return true;
+		}
+		// Fallback: check kernel release for -WSL suffix (WSL2 specific, reliable)
+		const osrelease = readFileSync("/proc/sys/kernel/osrelease", "utf-8").toLowerCase();
+		if (osrelease.includes("-wsl")) {
+			return true;
+		}
+		// Legacy fallback: check /proc/version for microsoft (WSL1, may cause false positive on Azure)
+		const version = readFileSync("/proc/version", "utf-8").toLowerCase();
+		if (version.includes("microsoft") && version.includes("wsl")) {
+			return true;
+		}
+		return false;
+	} catch {
+		return false;
+	}
+}
+
 const WEB_SEARCH_CONFIG_PATH = join(homedir(), ".pi", "web-search.json");
 
 interface WebSearchConfig {
@@ -296,11 +318,15 @@ function closeCurator(): void {
 
 async function openInBrowser(pi: ExtensionAPI, url: string): Promise<void> {
 	const plat = platform();
-	const result = plat === "darwin"
-		? await pi.exec("open", [url])
-		: plat === "win32"
-			? await pi.exec("cmd", ["/c", "start", "", url])
-			: await pi.exec("xdg-open", [url]);
+	const is_wsl = isWSL();
+	const result =
+		plat === "darwin"
+			? await pi.exec("open", [url])
+			: is_wsl
+				? await pi.exec("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${url}"`])
+				: plat === "win32"
+					? await pi.exec("cmd", ["/c", "start", "", url])
+					: await pi.exec("xdg-open", [url]);
 	if (result.code !== 0) {
 		throw new Error(result.stderr || `Failed to open browser (exit code ${result.code})`);
 	}
